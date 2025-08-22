@@ -5,7 +5,8 @@ import java.util.concurrent.TimeUnit;
 
 public class Config {
     private String baseUrl;
-    private String authEndpoint;
+    private String authGetDataEndpoint;
+    private String authGetTokenEndpoint;
     private String createDocumentEndpoint;
     private Duration connectionTimeout = Duration.ofSeconds(10);
     private Duration readTimeout = Duration.ofSeconds(30);
@@ -13,25 +14,36 @@ public class Config {
     private Duration createDocumentTimeout = Duration.ofSeconds(30);
     private int requestLimit = 10;
     private TimeUnit timeUnit = TimeUnit.SECONDS;
-
     // Конструкторы
     public Config() {}
 
-    public Config(String baseUrl, String authEndpoint, String createDocumentEndpoint) {
-        this.baseUrl = baseUrl;
-        this.authEndpoint = authEndpoint;
-        this.createDocumentEndpoint = createDocumentEndpoint;
-    }
+//    public Config(String baseUrl, String authEndpoint, String createDocumentEndpoint) {
+//        this.baseUrl = baseUrl;
+//        this.authEndpoint = authEndpoint;
+//        this.createDocumentEndpoint = createDocumentEndpoint;
+//    }
 
     // Геттеры и сеттеры
     public String getBaseUrl() { return baseUrl; }
     public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
 
-    public String getAuthEndpoint() { return authEndpoint; }
-    public void setAuthEndpoint(String authEndpoint) { this.authEndpoint = authEndpoint; }
-
     public String getCreateDocumentEndpoint() { return createDocumentEndpoint; }
     public void setCreateDocumentEndpoint(String createDocumentEndpoint) { this.createDocumentEndpoint = createDocumentEndpoint; }
+    public String getAuthGetTokenEndpoint() {
+        return authGetTokenEndpoint;
+    }
+
+    public void setAuthGetTokenEndpoint(String authGetTokenEndpoint) {
+        this.authGetTokenEndpoint = authGetTokenEndpoint;
+    }
+
+    public String getAuthGetDataEndpoint() {
+        return authGetDataEndpoint;
+    }
+
+    public void setAuthGetDataEndpoint(String authGetDataEndpoint) {
+        this.authGetDataEndpoint = authGetDataEndpoint;
+    }
 
     public Duration getConnectionTimeout() { return connectionTimeout; }
     public void setConnectionTimeout(Duration connectionTimeout) { this.connectionTimeout = connectionTimeout; }
