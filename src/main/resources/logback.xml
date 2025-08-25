@@ -26,4 +26,6 @@
     </root>
 
     <logger name="ru.selsup.test.CrptApi" level="DEBUG" />
+    <logger name="ru.CryptoPro" level="TRACE"/>
+    <logger name="ConsoleCertificateSelector" level="DEBUG"/>
 </configuration>

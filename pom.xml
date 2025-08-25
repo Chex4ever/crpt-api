@@ -25,13 +25,13 @@
         </dependencies>
     </dependencyManagement>
     <dependencies>
-        <dependency>
-            <groupId>ru.CryptoPro</groupId>
-            <artifactId>jcsp</artifactId>
-            <version>5.0.48378</version>
-            <scope>system</scope>
-            <systemPath>${project.basedir}/libs/jcsp.jar</systemPath>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>ru.CryptoPro</groupId>-->
+<!--            <artifactId>jcsp</artifactId>-->
+<!--            <version>5.0.48378</version>-->
+<!--            <scope>system</scope>-->
+<!--            <systemPath>${project.basedir}/libs/jcsp.jar</systemPath>-->
+<!--        </dependency>-->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-core</artifactId>
