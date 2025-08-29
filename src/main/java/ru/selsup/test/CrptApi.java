@@ -5,6 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import ru.selsup.crypto.CertificateSigningService;
+import ru.selsup.crypto.SigningException;
+import ru.selsup.crypto.SigningService;
 
 import java.io.IOException;
 import java.net.URI;
@@ -30,7 +33,7 @@ import java.util.concurrent.locks.ReentrantLock;
 public class CrptApi {
     public static final Logger logger = LoggerFactory.getLogger(CrptApi.class);
     public static final ObjectMapper mapper = new ObjectMapper();
-
+    private final CertificateSigningService signer;
     private static volatile Pair<PrivateKey, X509Certificate> selectedCertInfo;
 
     private final String baseUrl;
@@ -46,7 +49,8 @@ public class CrptApi {
     private final ScheduledExecutorService scheduler;
     private String authToken;
 
-    public CrptApi(Config config) {
+    public CrptApi(CertificateSigningService signer, Config config) {
+        this.signer = signer;
         logger.info("Initializing CrptApi with config: {}", config);
         if (config == null) {
             logger.error("Config cannot be null");
@@ -70,60 +74,14 @@ public class CrptApi {
 
     public synchronized CompletableFuture<Void> authenticate() {
         logger.info("Starting authentication process");
-        return fetchUuidAndDataFromServer()
-                .thenCompose(this::signData)
-                .thenCompose(this::sendSignedDataToServer);
-    }
-
-//    private static class CertSelectionCallback implements CryptoUICallback {
-//
-//    }
-
-    private static Pair<PrivateKey, X509Certificate> selectUserCertificate() {
-        if (selectedCertInfo != null) {
-            logger.info("Сертификат выбран: {}", selectedCertInfo);
-            return selectedCertInfo;
-        }
         try {
-            logger.info("...сертификат не выбран. Выбираем: keyStore = KeyStore.getInstance(\"Windows-MY\", \"SunMSCAPI\")");
-            KeyStore keyStore = KeyStore.getInstance("Windows-MY", "SunMSCAPI");
-            keyStore.load(null, null);
-            Enumeration<String> aliasesEnum = keyStore.aliases();
-            //todo - если только один сертификат, то не спрашивать...
-
-            logger.info("Начинаю перебирать сертификаты {}", aliasesEnum);
-            while (aliasesEnum.hasMoreElements()) {
-                String alias = aliasesEnum.nextElement();
-                logger.info("Нашёл сертификат {}", alias);
-                Certificate cert = keyStore.getCertificate(alias);
-                if (!(cert instanceof X509Certificate)) {
-                    logger.info("Не X509Certificate");
-                    continue;
-                }
-                if (((X509Certificate) cert).getBasicConstraints() < 0) {
-                    logger.info("Cert basic constraints is less than zero");
-                    continue;
-                }
-
-                logger.info("Choose certificate [\" + alias + \"] ? (y/n)");
-                System.out.println("Choose certificate [" + alias + "] ? (y/n)");
-                char answer = (char) System.in.read();
-                if (answer == 'y') {
-                    PrivateKey privateKey = (PrivateKey) keyStore.getKey(alias, "".toCharArray());
-                    selectedCertInfo = new Pair<>(privateKey, (X509Certificate) cert);
-                    break;
-                }
-            }
-        } catch (KeyStoreException | NoSuchProviderException | IOException | NoSuchAlgorithmException |
-                 CertificateException | UnrecoverableKeyException e) {
+            return fetchUuidAndDataFromServer()
+                    .thenCompose(this::signData)
+                    .thenCompose(this::sendSignedDataToServer);
+        } catch (Exception e) {
+            logger.error("InterruptedException", e);
             throw new RuntimeException(e);
         }
-
-        if (selectedCertInfo == null) {
-            throw new RuntimeException("No valid certificates found or chosen!");
-        }
-        logger.info("Выбран сертификат {}",selectedCertInfo);
-        return selectedCertInfo;
     }
 
     private void resetRequestsCounter() {
@@ -139,7 +97,8 @@ public class CrptApi {
         }, periodDuration.toMillis(), TimeUnit.MILLISECONDS);
     }
 
-    private CompletableFuture<Pair<String, String>> fetchUuidAndDataFromServer() {
+    private CompletableFuture<Pair<String, String>> fetchUuidAndDataFromServer() throws InterruptedException {
+        checkRateLimit();
         logger.info("Fetching UUID and data from server.");
         URI uri = URI.create(baseUrl + authGetDataEndpoint);
         HttpRequest request = HttpRequest.newBuilder()
@@ -159,12 +118,14 @@ public class CrptApi {
                         logger.info("Received uuid={}, data={}", uuid, data);
                         return new Pair<>(uuid, data);
                     } catch (JsonProcessingException e) {
-                        logger.error("Error parsing resonse:", e);
+                        logger.error("Error parsing response: body:{}, headers:{}", response.body(), response.headers(), e);
+
                         throw new RuntimeException(e);
                     }
                 })
                 .exceptionally(throwable -> {
                     logger.error("Fetching UUID and data from server failed", throwable);
+
                     throw new CompletionException(throwable);
                 });
     }
@@ -173,29 +134,27 @@ public class CrptApi {
         String uuid = pair.first;
         String data = pair.second;
 
-        logger.info("Выбираем сертификат пользователя (Если ещё не выбрали)");
-        Pair<PrivateKey, X509Certificate> certInfo = selectUserCertificate();
-        PrivateKey privateKey = certInfo.first;
-        X509Certificate cert = certInfo.second;
-
-        logger.info("Signing data using CryptoPro CSP");
-        Signature sig = null;
         try {
-            sig = Signature.getInstance("SHA256withRSA", "CryptoPro");
-            sig.initSign(privateKey);
-            sig.update(data.getBytes(StandardCharsets.UTF_8));
-            byte[] signedData = sig.sign();
-            String base64SignedData = Base64.getEncoder().encodeToString(signedData);
-            return CompletableFuture.completedFuture(new Pair<>(uuid, base64SignedData));
-        } catch (NoSuchAlgorithmException | NoSuchProviderException | InvalidKeyException | SignatureException e) {
+            return CompletableFuture.completedFuture(new Pair<>(uuid, signer.signDataAttachedv2(data)));
+        } catch (SigningException e) {
+            logger.warn("Ошибка создания присоединенной подписи", e);
             throw new RuntimeException(e);
         }
     }
 
     private CompletableFuture<Void> sendSignedDataToServer(Pair<String, String> pair) {
+        try {
+            checkRateLimit();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        
         String uuid = pair.first;
         String signedData = pair.second;
-
+        if (!isValidBase64(signedData)) {
+            logger.error("Данные не в формате base64!");
+            throw new RuntimeException("Invalid base64 format");
+        }
         logger.info("Sending signed data back to server.");
         ObjectNode jsonBody = mapper.createObjectNode();
         jsonBody.put("uuid", uuid)
@@ -205,15 +164,16 @@ public class CrptApi {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(uri)
                 .header("Content-Type", "application/json")
+                .header("charset'", "UTF-8")
                 .POST(HttpRequest.BodyPublishers.ofString(body))
                 .build();
 
-        logger.debug("Sending authentication request to: {}, body: {}", uri, body);
+        logger.debug("Sending authentication request to: {}, body: {}, headers: {}", uri, HttpRequest.BodyPublishers.ofString(body), request.headers());
 
         return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenAccept(response -> {
                     if (response.statusCode() != 200) {
-                        logger.error("Authentication failed with status code: {}", response.statusCode());
+                        logger.error("Authentication failed with status code: {}, \nbody: {}, \nheaders: {}", response.statusCode(), response.body(), response.headers());
                         throw new RuntimeException("Authentication failed: " + response.statusCode());
                     }
                     try {
@@ -229,6 +189,15 @@ public class CrptApi {
                     logger.error("Authentication request failed", throwable);
                     throw new CompletionException(throwable);
                 });
+    }
+
+    private boolean isValidBase64(String str) {
+        try {
+            Base64.getDecoder().decode(str);
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 
     public CompletableFuture<String> createDocument(Document document, String signature) throws JsonProcessingException, InterruptedException {
@@ -278,10 +247,11 @@ public class CrptApi {
             long currentCount = requestsCounter.incrementAndGet();
             logger.debug("Current request count: {}", currentCount);
 
-            while (requestsCounter.incrementAndGet() > requestLimit) {
+            while (currentCount > requestLimit) {
                 logger.warn("Rate limit exceeded ({} > {}). Waiting for reset...", currentCount, requestLimit);
                 Thread.sleep(periodDuration.toMillis());
                 requestsCounter.set(0);
+                currentCount = requestsCounter.incrementAndGet();
                 logger.debug("Request counter reset. New count: {}", requestsCounter.get());
 
             }
