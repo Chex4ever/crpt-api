@@ -1,4 +1,4 @@
-package ru.selsup.test;
+package ru.selsup.trueapi;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -7,7 +7,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
-import java.security.Security;
 import java.time.Duration;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
@@ -18,11 +17,6 @@ public class ConfigLoader {
     public Config loadConfig() {
         Properties props = loadProperties();
         return createConfigFromProperties(props);
-    }
-
-    public static Config loadDefaultConfig() {
-
-        return new ConfigLoader().loadConfig();
     }
 
     private Properties loadProperties() {
@@ -89,25 +83,4 @@ public class ConfigLoader {
             field.set(target, TimeUnit.valueOf(value.toUpperCase()));
         }
     }
-//
-//    private void setDurationProperty(Properties props, String key, java.util.function.Consumer<Duration> setter) {
-//        String value = props.getProperty(key);
-//        if (value != null) {
-//            setter.accept(Duration.ofMillis(Long.parseLong(value)));
-//        }
-//    }
-//
-//    private void setIntProperty(Properties props, String key, java.util.function.Consumer<Integer> setter) {
-//        String value = props.getProperty(key);
-//        if (value != null) {
-//            setter.accept(Integer.parseInt(value));
-//        }
-//    }
-//
-//    private void setTimeUnitProperty(Properties props, String key, java.util.function.Consumer<TimeUnit> setter) {
-//        String value = props.getProperty(key);
-//        if (value != null) {
-//            setter.accept(TimeUnit.valueOf(value.toUpperCase()));
-//        }
-//    }
 }
