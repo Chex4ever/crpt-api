@@ -25,5 +25,8 @@
         <appender-ref ref="FILE" />
     </root>
 
-    <logger name="ru.selsup.test.CrptApi" level="DEBUG" />
+    <logger name="ru.selsup.trueapi" level="DEBUG" />
+    <logger name="ru.CryptoPro" level="DEBUG"/>
+    <logger name="ConsoleCertificateSelector" level="DEBUG"/>
+    <logger name="ru.selsup.crypto" level="DEBUG"/>
 </configuration>

@@ -1,0 +1,86 @@
+package ru.selsup.trueapi;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.lang.reflect.Field;
+import java.time.Duration;
+import java.util.Properties;
+import java.util.concurrent.TimeUnit;
+
+public class ConfigLoader {
+    private static final Logger logger = LoggerFactory.getLogger(ConfigLoader.class);
+
+    public Config loadConfig() {
+        Properties props = loadProperties();
+        return createConfigFromProperties(props);
+    }
+
+    private Properties loadProperties() {
+        return loadProperties("application.properties");
+    }
+
+    private Properties loadProperties(String configPath) {
+        Properties props = new Properties();
+        try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(configPath)) {
+            if (inputStream == null) {
+                logger.error("Файл {} не найден в classpath", configPath);
+                throw new IllegalStateException("Файл " + configPath + " не найден в classpath");
+            }
+            props.load(inputStream);
+
+            logger.info("Загружены свойства из {}", configPath);
+            return props;
+        } catch (IOException e) {
+            logger.error("Ошибка при чтении файла конфигурации", e);
+            throw new UncheckedIOException("Ошибка при чтении файла конфигурации", e);
+        }
+    }
+
+    private Config createConfigFromProperties(Properties props) {
+        Config config = new Config();
+        mapPropertiesAutomatically(props, config);
+        if (config.getRequestLimit() <= 0 || config.getTimeUnit() == null) {
+            throw new IllegalArgumentException("Invalid parameters");
+        }
+        return config;
+    }
+
+    private void mapPropertiesAutomatically(Properties props, Config config) {
+        try {
+            Field[] fields = Config.class.getDeclaredFields();
+            for (Field field : fields) {
+                String propertyName = "crpt.api." + camelToKebab(field.getName());
+                String value = props.getProperty(propertyName);
+
+                if (value != null) {
+                    field.setAccessible(true);
+                    setFieldValue(field, config, value);
+                }
+            }
+        } catch (Exception e) {
+            logger.warn("Ошибка автоматического маппинга свойств, используй явный маппинг (todo)", e);
+        }
+    }
+
+    private String camelToKebab(String camelCase) {
+        return camelCase.replaceAll("([a-z])([A-Z])", "$1-$2").toLowerCase();
+    }
+
+    private void setFieldValue(Field field, Object target, String value) throws IllegalAccessException {
+        Class<?> type = field.getType();
+
+        if (type == String.class) {
+            field.set(target, value);
+        } else if (type == int.class || type == Integer.class) {
+            field.set(target, Integer.parseInt(value));
+        } else if (type == Duration.class) {
+            field.set(target, Duration.ofMillis(Long.parseLong(value)));
+        } else if (type == TimeUnit.class) {
+            field.set(target, TimeUnit.valueOf(value.toUpperCase()));
+        }
+    }
+}
