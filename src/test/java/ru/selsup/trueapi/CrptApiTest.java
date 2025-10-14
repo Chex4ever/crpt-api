@@ -113,8 +113,8 @@ class CrptApiTest {
 
     @Test
     void whenSendDocument_thenReturnsSuccess() throws Exception {
-        when(tokenStorage.isValid()).thenReturn(true);
-        when(tokenStorage.getToken()).thenReturn("valid-token");
+//        when(tokenStorage.isValid()).thenReturn(true);
+//        when(tokenStorage.getToken()).thenReturn("valid-token");
 
         when(httpClient.sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
                 .thenAnswer(invocation -> CompletableFuture.completedFuture(httpResponse));

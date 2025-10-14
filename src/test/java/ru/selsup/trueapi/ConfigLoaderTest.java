@@ -4,12 +4,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ConfigLoaderTest {
@@ -33,18 +36,26 @@ class ConfigLoaderTest {
         
         assertNotNull(loader);
     }
-    
+
     @Test
-    void testLoadConfig_WithInvalidRequestLimit_ThrowsException() {
+    void testLoadConfig_WithInvalidRequestLimit_ThrowsException() throws Exception {
         ConfigLoader loader = new ConfigLoader();
         Properties props = new Properties();
         props.setProperty("crpt.api.request-limit", "-1");
         props.setProperty("crpt.api.time-unit", "SECONDS");
-        
-        // Тестируем через reflection или модифицируем класс для тестируемости
-        assertThrows(IllegalArgumentException.class, () -> {
-            // loader.createConfigFromProperties(props);
-        });
+        props.setProperty("crpt.api.base-url-v3", "https://api.test.com");
+
+        Method method = ConfigLoader.class.getDeclaredMethod("createConfigFromProperties", Properties.class);
+        method.setAccessible(true);
+
+        // Используем assertThrows с InvocationTargetException
+        InvocationTargetException exception = assertThrows(InvocationTargetException.class,
+                () -> method.invoke(loader, props));
+
+        // Проверяем корневую причину
+        assertThat(exception.getCause())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Request limit must be positive");
     }
     
     @Test

@@ -203,8 +203,13 @@ public class CrptApi {
         String signature = null;
         try {
             signature = signer.signData(jsonDocument, true);
+            if (signature == null) {
+                logger.error("Нет подписи");
+                throw new SigningException("Signature is null");
+            }
         } catch (SigningException e) {
-            throw new RuntimeException(e);
+            logger.error("Ошибка подписания документа", e);
+            throw new RuntimeException("Document signing failed", e);
         }
         String base64Signature = Base64.getEncoder().encodeToString(signature.getBytes(StandardCharsets.UTF_8));
         requestBody.put("document_format", document.getType().getFormat().getCode())
