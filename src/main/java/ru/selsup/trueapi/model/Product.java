@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
+
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class Product {
     @JsonProperty("uit_code")
@@ -23,9 +24,7 @@ public class Product {
         this.certificates = certificates;
     }
 
-    public String getUitCode() {
-        return uitCode;
-    }
+    public String getUitCode() { return uitCode; }
 
     public void setUitCode(String uitCode) {
         this.uitCode = uitCode;

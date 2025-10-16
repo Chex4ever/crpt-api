@@ -56,9 +56,9 @@ public class FileTokenStorage implements TokenStorage {
     public boolean isValid() {
         try {
             TokenData tokenData = readTokenData();
-            return tokenData != null && 
-                   tokenData.token != null &&
-                   Instant.now().isBefore(tokenData.expirationTime);
+            return tokenData != null &&
+                    tokenData.token != null &&
+                    Instant.now().isBefore(tokenData.expirationTime);
         } catch (IOException e) {
             return false;
         }
@@ -87,21 +87,9 @@ public class FileTokenStorage implements TokenStorage {
         if (!Files.exists(tokenFile)) {
             return null;
         }
-        
+
         String json = Files.readString(tokenFile);
         return objectMapper.readValue(json, TokenData.class);
-    }
-
-    private static class TokenData {
-        public String token;
-        public Instant expirationTime;
-
-        public TokenData() {} // Для Jackson
-
-        public TokenData(String token, Instant expirationTime) {
-            this.token = token;
-            this.expirationTime = expirationTime;
-        }
     }
 
     private ObjectMapper createObjectMapper() {
@@ -109,5 +97,17 @@ public class FileTokenStorage implements TokenStorage {
         mapper.registerModule(new JavaTimeModule());
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         return mapper;
+    }
+
+    private static class TokenData {
+        public String token;
+        public Instant expirationTime;
+
+        public TokenData() {} // Для Jackson - не удалять!
+
+        public TokenData(String token, Instant expirationTime) {
+            this.token = token;
+            this.expirationTime = expirationTime;
+        }
     }
 }

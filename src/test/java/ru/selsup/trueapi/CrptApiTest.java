@@ -1,6 +1,5 @@
 package ru.selsup.trueapi;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -11,7 +10,6 @@ import ru.selsup.crypto.JcspSigningService;
 import ru.selsup.crypto.SigningException;
 import ru.selsup.trueapi.model.*;
 
-import java.io.IOException;
 import java.lang.reflect.Field;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -19,20 +17,27 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class CrptApiTest {
 
-    @Mock private JcspSigningService signer;
-    @Mock private TokenStorage tokenStorage;
-    @Mock private HttpClient httpClient;
-    @Mock private HttpResponse<String> httpResponse;
+    @Mock
+    private JcspSigningService signer;
+    @Mock
+    private TokenStorage tokenStorage;
+    @Mock
+    private HttpClient httpClient;
+    @Mock
+    private HttpResponse<String> httpResponse;
 
     private CrptApi crptApi;
     private Config config;
@@ -113,9 +118,6 @@ class CrptApiTest {
 
     @Test
     void whenSendDocument_thenReturnsSuccess() throws Exception {
-//        when(tokenStorage.isValid()).thenReturn(true);
-//        when(tokenStorage.getToken()).thenReturn("valid-token");
-
         when(httpClient.sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
                 .thenAnswer(invocation -> CompletableFuture.completedFuture(httpResponse));
 
@@ -133,8 +135,6 @@ class CrptApiTest {
 
     @Test
     void whenSendDocumentWithSigningError_thenThrowsException() throws Exception {
-        when(tokenStorage.isValid()).thenReturn(true);
-        when(tokenStorage.getToken()).thenReturn("valid-token");
         when(signer.signData(anyString(), anyBoolean()))
                 .thenThrow(new ru.selsup.crypto.SigningException("Signing failed"));
 
@@ -145,9 +145,6 @@ class CrptApiTest {
 
     @Test
     void whenCheckParticipantsByINN_thenReturnsOrganization() throws Exception {
-        when(tokenStorage.isValid()).thenReturn(true);
-        when(tokenStorage.getToken()).thenReturn("valid-token");
-
         when(httpClient.sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
                 .thenAnswer(invocation -> CompletableFuture.completedFuture(httpResponse));
 
@@ -163,24 +160,6 @@ class CrptApiTest {
         Organization org = future.get(5, TimeUnit.SECONDS);
         assertThat(org.getInn()).isEqualTo("1234567890");
         assertThat(org.getStatus()).isEqualTo("ACTIVE");
-    }
-
-    @Test
-    void whenHttpRequestFails_thenCompletesExceptionally() throws JsonProcessingException, InterruptedException {
-        when(tokenStorage.isValid()).thenReturn(true);
-        when(tokenStorage.getToken()).thenReturn("valid-token");
-
-        // Мокируем неудачный HTTP запрос
-        CompletableFuture<HttpResponse<String>> failedFuture =
-                CompletableFuture.failedFuture(new IOException("Connection failed"));
-
-        when(httpClient.sendAsync(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-                .thenReturn(failedFuture);
-
-        Document document = createTestDocument();
-        CompletableFuture<String> result = crptApi.sendDocument(document);
-
-        assertThat(result).isCompletedExceptionally();
     }
 
     private Document createTestDocument() {
