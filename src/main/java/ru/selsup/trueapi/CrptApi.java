@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class CrptApi {
@@ -38,6 +39,7 @@ public class CrptApi {
 
     private final HttpClient httpClient;
     private final ReentrantLock lock = new ReentrantLock();
+    private final Condition resetCondition = lock.newCondition();
     private final AtomicLong requestsCounter = new AtomicLong(0);
     private final Duration periodDuration;
     private final int requestLimit;
@@ -83,19 +85,6 @@ public class CrptApi {
             logger.error("Ошибка авторизации", e);
             return CompletableFuture.failedFuture(e);
         }
-    }
-
-    private void schedulePeriodicCounterReset() {
-        scheduler.schedule(() -> {
-            lock.lock();
-            try {
-                long currentCount = requestsCounter.get();
-                requestsCounter.set(0);
-                logger.debug("Сброс счётчика {} на 0", currentCount);
-            } finally {
-                lock.unlock();
-            }
-        }, periodDuration.toMillis(), TimeUnit.MILLISECONDS);
     }
 
     private CompletableFuture<AuthDataPair> fetchUuidAndDataFromServer() throws InterruptedException {
@@ -200,11 +189,16 @@ public class CrptApi {
         logger.debug("json: {}", jsonDocument);
         String base64Document = Base64.getEncoder().encodeToString(jsonDocument.getBytes(StandardCharsets.UTF_8));
         ObjectNode requestBody = mapper.createObjectNode();
-        String signature = null;
+        String signature;
         try {
             signature = signer.signData(jsonDocument, true);
+            if (signature == null) {
+                logger.error("Нет подписи");
+                throw new SigningException("Signature is null");
+            }
         } catch (SigningException e) {
-            throw new RuntimeException(e);
+            logger.error("Ошибка подписания документа", e);
+            throw new RuntimeException("Document signing failed", e);
         }
         String base64Signature = Base64.getEncoder().encodeToString(signature.getBytes(StandardCharsets.UTF_8));
         requestBody.put("document_format", document.getType().getFormat().getCode())
@@ -268,24 +262,93 @@ public class CrptApi {
         });
     }
 
-    private void acquireRequestPermit() throws InterruptedException {
+    public void resetRateLimit() {
         lock.lock();
         try {
-            long currentCount = requestsCounter.incrementAndGet();
-            logger.debug("Current request count: {}", currentCount);
-
-            while (currentCount > requestLimit) {
-                logger.warn("Rate limit exceeded ({} > {}). Waiting for reset...", currentCount, requestLimit);
-                Thread.sleep(periodDuration.toMillis());
+            long currentCount = requestsCounter.get();
+            if (currentCount > 0) {
+                logger.info("Manual reset: counter {} → 0", currentCount);
                 requestsCounter.set(0);
-                currentCount = requestsCounter.incrementAndGet();
-                logger.debug("Request counter reset. New count: {}", requestsCounter.get());
-
+                resetCondition.signalAll(); // ← ВАЖНО: пробуждаем ждущие потоки!
             }
         } finally {
             lock.unlock();
         }
     }
+
+    private void acquireRequestPermit() throws InterruptedException {
+        lock.lock();
+        try {
+            while (true) {
+                long currentCount = requestsCounter.get();
+
+                if (currentCount < requestLimit) {
+                    requestsCounter.incrementAndGet();
+                    logger.debug("Request permitted. Current count: {}", currentCount + 1);
+                    return;
+                }
+                logger.warn("Rate limit exceeded ({} >= {}). Waiting for reset...",
+                        currentCount, requestLimit);
+                boolean signaled = resetCondition.await(periodDuration.toMillis(), TimeUnit.MILLISECONDS);
+                if (signaled) {
+                    logger.debug("Awaken by reset signal");
+                } else {
+                    logger.debug("Awaken by timeout");
+                }
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private void schedulePeriodicCounterReset() {
+        scheduler.scheduleAtFixedRate(() -> {
+            lock.lock();
+            try {
+                long currentCount = requestsCounter.get();
+                if (currentCount > 0) {
+                    logger.debug("Periodic reset: counter {} → 0", currentCount);
+                    requestsCounter.set(0);
+                    resetCondition.signalAll(); // ← ПРОБУЖДАЕМ все ожидающие потоки!
+                }
+            } finally {
+                lock.unlock();
+            }
+        }, periodDuration.toMillis(), periodDuration.toMillis(), TimeUnit.MILLISECONDS);
+    }
+
+
+//    private void schedulePeriodicCounterReset() {
+//        scheduler.schedule(() -> {
+//            lock.lock();
+//            try {
+//                long currentCount = requestsCounter.get();
+//                requestsCounter.set(0);
+//                logger.debug("Сброс счётчика {} на 0", currentCount);
+//            } finally {
+//                lock.unlock();
+//            }
+//        }, periodDuration.toMillis(), TimeUnit.MILLISECONDS);
+//    }
+
+//    private void acquireRequestPermit() throws InterruptedException {
+//        lock.lock();
+//        try {
+//            long currentCount = requestsCounter.incrementAndGet();
+//            logger.debug("Current request count: {}", currentCount);
+//
+//            while (currentCount > requestLimit) {
+//                logger.warn("Rate limit exceeded ({} > {}). Waiting for reset...", currentCount, requestLimit);
+//                Thread.sleep(periodDuration.toMillis());
+//                requestsCounter.set(0);
+//                currentCount = requestsCounter.incrementAndGet();
+//                logger.debug("Request counter reset. New count: {}", requestsCounter.get());
+//
+//            }
+//        } finally {
+//            lock.unlock();
+//        }
+//    }
 
 
 }

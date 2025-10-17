@@ -1,6 +1,5 @@
 package ru.selsup.crypto;
 
-import java.security.cert.X509Certificate;
 import java.util.Date;
 
 public class CertificateInfo {
@@ -10,9 +9,9 @@ public class CertificateInfo {
     private final Date validFrom;
     private final Date validTo;
     private final String storeType;
-    
-    public CertificateInfo(String alias, String subject, String issuer, 
-                          Date validFrom, Date validTo, String storeType) {
+
+    public CertificateInfo(String alias, String subject, String issuer,
+                           Date validFrom, Date validTo, String storeType) {
         this.alias = alias;
         this.subject = subject;
         this.issuer = issuer;
@@ -20,7 +19,7 @@ public class CertificateInfo {
         this.validTo = validTo;
         this.storeType = storeType;
     }
-    
+
     // Getters
     public String getAlias() { return alias; }
     public String getSubject() { return subject; }
@@ -31,9 +30,9 @@ public class CertificateInfo {
     
     @Override
     public String toString() {
-        return String.format("%s (до %s)", 
-            subject.length() > 50 ? subject.substring(0, 50) + "..." : subject,
-            validTo.toString().substring(0, 10)
+        return String.format("%s (до %s)",
+                subject.length() > 50 ? subject.substring(0, 50) + "..." : subject,
+                validTo.toString().substring(0, 10)
         );
     }
 }

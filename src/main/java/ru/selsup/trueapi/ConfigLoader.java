@@ -44,7 +44,7 @@ public class ConfigLoader {
         Config config = new Config();
         mapPropertiesAutomatically(props, config);
         if (config.getRequestLimit() <= 0 || config.getTimeUnit() == null) {
-            throw new IllegalArgumentException("Invalid parameters");
+            throw new IllegalArgumentException("Request limit must be positive");
         }
         return config;
     }
@@ -63,6 +63,7 @@ public class ConfigLoader {
             }
         } catch (Exception e) {
             logger.warn("Ошибка автоматического маппинга свойств, используй явный маппинг (todo)", e);
+            throw new IllegalArgumentException("Reading config with reflection map error", e);
         }
     }
 

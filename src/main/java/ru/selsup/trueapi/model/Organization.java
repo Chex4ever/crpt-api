@@ -2,6 +2,18 @@ package ru.selsup.trueapi.model;
 
 public class Organization {
     private String inn;
+    private String status;
+    private String productGroups;
+    private String is_registered;
+    private String is_kfh;
+
+    public Organization(String inn, String status, String productGroups, String is_registered, String is_kfh) {
+        this.inn = inn;
+        this.status = status;
+        this.productGroups = productGroups;
+        this.is_registered = is_registered;
+        this.is_kfh = is_kfh;
+    }
 
     @Override
     public String toString() {
@@ -12,14 +24,6 @@ public class Organization {
                 ", is_registered='" + is_registered + '\'' +
                 ", is_kfh='" + is_kfh + '\'' +
                 '}';
-    }
-
-    public Organization(String inn, String status, String productGroups, String is_registered, String is_kfh) {
-        this.inn = inn;
-        this.status = status;
-        this.productGroups = productGroups;
-        this.is_registered = is_registered;
-        this.is_kfh = is_kfh;
     }
 
     public String getStatus() {
@@ -34,9 +38,7 @@ public class Organization {
         return inn;
     }
 
-    public void setInn(String inn) {
-        this.inn = inn;
-    }
+    public void setInn(String inn) { this.inn = inn; }
 
     public String getProductGroups() {
         return productGroups;
@@ -61,9 +63,4 @@ public class Organization {
     public void setIs_kfh(String is_kfh) {
         this.is_kfh = is_kfh;
     }
-
-    private String status ;
-    private String productGroups;
-    private String is_registered;
-    private String is_kfh;
 }

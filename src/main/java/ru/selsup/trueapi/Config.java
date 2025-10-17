@@ -15,6 +15,7 @@ public class Config {
     private Duration createDocumentTimeout = Duration.ofSeconds(30);
     private int requestLimit = 10;
     private TimeUnit timeUnit = TimeUnit.SECONDS;
+
     public Config() {
     }
 

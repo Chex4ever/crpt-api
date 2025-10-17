@@ -1,7 +1,11 @@
 package ru.selsup.crypto;
 
-import org.bouncycastle.asn1.*;
-import org.bouncycastle.asn1.cms.*;
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
+import org.bouncycastle.asn1.DERSet;
+import org.bouncycastle.asn1.cms.Attribute;
+import org.bouncycastle.asn1.cms.AttributeTable;
+import org.bouncycastle.asn1.cms.CMSAttributes;
+import org.bouncycastle.asn1.cms.Time;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.util.CollectionStore;
 import org.slf4j.Logger;
@@ -20,8 +24,8 @@ import java.util.*;
 
 public class JcspSigningService implements SigningService {
     public static final Logger logger = LoggerFactory.getLogger(JcspSigningService.class);
-    private CertificateInfo cert;
     public String defaultAlgo;
+    private CertificateInfo cert;
 
     public JcspSigningService(StorageDiscoverer discoverer) throws NoCertificateFoundException {
         CertificateSelector selector = new ConsoleCertificateSelector();
@@ -29,7 +33,7 @@ public class JcspSigningService implements SigningService {
         if (allCerts.isEmpty()) {
             throw new NoCertificateFoundException("Не найдено сертификатов");
         }
-        this.cert = allCerts.get(0);
+        this.cert = allCerts.getFirst();
         if (allCerts.size() > 1) {
             this.cert = selector.selectCertificate(allCerts);
             if (this.cert == null) {
@@ -37,6 +41,18 @@ public class JcspSigningService implements SigningService {
             }
         }
         logger.info("Сертификат выбран: {}", this.cert.getAlias());
+    }
+
+    public JcspSigningService(StorageDiscoverer discoverer, String certAlias) throws NoCertificateFoundException {
+        List<CertificateInfo> allCerts = discoverer.discoverAllContainers().values().stream().flatMap(List::stream).toList();
+        if (allCerts.isEmpty()) {
+            throw new NoCertificateFoundException("Не найдено сертификатов");
+        }
+        this.cert = allCerts.stream()
+                .filter(c -> c.getAlias().equals(certAlias))
+                .findFirst()
+                .orElseThrow(() -> new NoCertificateFoundException("Сертификат с alias '" + certAlias + "' не найден"));
+        logger.info("Сертификат выбран автоматически: {}", this.cert.getAlias());
     }
 
     @Override
@@ -106,16 +122,12 @@ public class JcspSigningService implements SigningService {
     }
 
     public static class GostOIDs {
-        // ГОСТ Р 34.10-2012 с ключом 256 бит
         public static final String GOST3411_2012_256_WITH_GOST3410_2012_256 = "1.2.643.7.1.1.3.2";
-        // ГОСТ Р 34.10-2012 с ключом 512 бит
         public static final String GOST3411_2012_512_WITH_GOST3410_2012_512 = "1.2.643.7.1.1.3.3";
-        // ГОСТ Р 34.10-2001 (старый)
         public static final String GOST3411_WITH_GOST3410 = "1.2.643.2.2.3";
         public static final String GOST3411_WITH_ECGOST3410 = "1.2.643.2.2.4";
         public static final String GOST3411 = "1.2.643.7.1.1.1.1";
         public static final String GOST3410EL = "1.2.643.7.1.1.1.2";
-        // OID для атрибутов CMS
         public static final String CONTENT_TYPE = "1.2.840.113549.1.9.3";
         public static final String MESSAGE_DIGEST = "1.2.840.113549.1.9.4";
         public static final String SIGNING_TIME = "1.2.840.113549.1.9.5";
@@ -125,19 +137,6 @@ public class JcspSigningService implements SigningService {
     public class JcspAlgorithms {
         public static final String GOST3411_2012_256_WITH_GOST3410_2012_256 = "GOST3411-2012-256withGOST3410-2012-256";
         public static final String GOST3411_2012_512_WITH_GOST3410_2012_512 = "GOST3411-2012-512withGOST3410-2012-512";
-        // ЕДИНСТВЕННЫЙ алгоритм хеширования в JCSP
         public static final String GOST3411 = "GOST3411"; // Автоматически выбирает размер based on контекста
-    }
-
-    private int getKeySize(PrivateKey privateKey) {
-        try {
-            if (privateKey instanceof ECPrivateKey) {
-                return ((ECPrivateKey) privateKey).getParams().getOrder().bitLength();
-            }
-            // Другие типы ключей...
-        } catch (Exception e) {
-            return 256; // default
-        }
-        return 256;
     }
 }

@@ -75,7 +75,8 @@ public enum DocumentType {
         this.description = description;
         this.format = format;
     }
-//    public String getValue() {
+
+    //    public String getValue() {
 //        return value;
 //    }
     @JsonValue
